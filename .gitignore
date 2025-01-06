@@ -5,3 +5,4 @@ data/
 saved_models/
 .venv/
 cuda_test.py
+.openai_api_key
