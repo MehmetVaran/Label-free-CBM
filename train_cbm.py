@@ -95,7 +95,7 @@ def train_cbm_and_save(args):
         for i, concept in enumerate(concepts):
             if highest[i]<=args.clip_cutoff:
                 print("Deleting {}, CLIP top5:{:.3f}".format(concept, highest[i]))
-    concepts = [concepts[i] for i in range(len(concepts)) if highest[i]>args.clip_cutoff]
+    concepts = [concept for i, concept in enumerate(concepts) if i < len(highest) and highest[i] > args.clip_cutoff]
     
     #save memory by recalculating
     del clip_features

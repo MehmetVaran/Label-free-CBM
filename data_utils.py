@@ -9,7 +9,9 @@ DATASET_ROOTS = {
     "imagenet_train": "YOUR_PATH/CLS-LOC/train/",
     "imagenet_val": "YOUR_PATH/ImageNet_val/",
     "cub_train":"data/CUB/train",
-    "cub_val":"data/CUB/test"
+    "cub_val":"data/CUB/test",
+    "chestxray_train":"data/ChestXray/train",
+    "chestxray_val":"data/ChestXray/test",
 }
 
 LABEL_FILES = {"places365":"data/categories_places365_clean.txt",

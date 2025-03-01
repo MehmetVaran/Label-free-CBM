@@ -19,6 +19,10 @@ def cos_similarity_cubed_single(clip_feats, target_feats):
     clip_feats = clip_feats/torch.norm(clip_feats, p=2, dim=0, keepdim=True)
     target_feats = target_feats/torch.norm(target_feats, p=2, dim=0, keepdim=True)
 
+    # Ensure the shapes match
+    if clip_feats.shape != target_feats.shape:
+        raise ValueError(f"Shape mismatch: clip_feats shape {clip_feats.shape} and target_feats shape {target_feats.shape} must be the same.")
+
     similarities = torch.sum(target_feats*clip_feats, dim=0)
     return similarities
 
