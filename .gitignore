@@ -6,4 +6,5 @@ saved_models/
 .venv/
 cuda_test.py
 .openai_api_key
-chestxray_imgs_pt1/
+chestxray_imgs/
+chestxray_imgs_parts/

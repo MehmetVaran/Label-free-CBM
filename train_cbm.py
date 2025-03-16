@@ -186,6 +186,16 @@ def train_cbm_and_save(args):
         train_c /= train_std
         
         train_y = torch.LongTensor(train_targets)
+        # Add these prints before indexed_train_ds = IndexedTensorDataset(train_c, train_y)
+        print(f"train_c shape: {train_c.shape}")
+        print(f"train_y shape: {train_y.shape}") 
+        print(f"Number of train_targets: {len(train_targets)}")
+        print(f"Number of target_features: {len(target_features)}")
+
+        # Add after loading target_features
+        print(f"Loaded target_features shape: {target_features.shape}")
+        print(f"Dataset: {args.dataset}")
+        print(f"d_train: {d_train}")
         indexed_train_ds = IndexedTensorDataset(train_c, train_y)
 
         val_c -= train_mean
