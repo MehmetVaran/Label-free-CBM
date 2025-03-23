@@ -235,3 +235,16 @@ def get_concept_act_by_pred(model, dataset, device):
         concept_acts_by_pred.append(torch.mean(concept_acts[preds==i], dim=0))
     concept_acts_by_pred = torch.stack(concept_acts_by_pred, dim=0)
     return concept_acts_by_pred
+
+def get_topk_accuracy_cbm(model, dataset, device, k=5, batch_size=250, num_workers=2):
+    correct = 0
+    total = 0
+    for images, labels in tqdm(DataLoader(dataset, batch_size, num_workers=num_workers,
+                                           pin_memory=True)):
+        with torch.no_grad():
+            outs, _ = model(images.to(device))
+            _, pred = torch.topk(outs, k, dim=1)
+            labels = labels.view(-1, 1).expand(-1, k)
+            correct += torch.sum(pred.cpu() == labels)
+            total += len(labels)
+    return correct/total
