@@ -9,3 +9,5 @@ cuda_test.py
 .umls_api_key
 chestxray_imgs/
 chestxray_imgs_parts/
+data/
+.vscode/
