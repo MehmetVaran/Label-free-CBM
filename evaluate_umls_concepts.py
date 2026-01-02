@@ -434,6 +434,36 @@ class UMLSConceptEvaluator:
 
 def load_disease_data(json_path: str) -> Dict[str, Dict[str, Any]]:
     """Load disease data from JSON file."""
+    p = Path(json_path)
+
+    # If a directory is provided, load all .txt files inside as separate diseases
+    if p.is_dir():
+        results: Dict[str, Dict[str, Any]] = {}
+        for txt in sorted(p.glob("*.txt")):
+            disease_name = txt.stem
+            lines = [l.strip() for l in txt.read_text(encoding="utf-8").splitlines() if l.strip()]
+            candidates = [{"name": name} for name in lines]
+            results[disease_name] = {
+                "disease": disease_name,
+                "candidate_concepts": candidates,
+                "related_concepts": {},
+            }
+        return results
+
+    # If a single text file is provided, treat it as one disease (filename -> disease)
+    if p.suffix.lower() == ".txt":
+        disease_name = p.stem
+        lines = [l.strip() for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
+        candidates = [{"name": name} for name in lines]
+        return {
+            disease_name: {
+                "disease": disease_name,
+                "candidate_concepts": candidates,
+                "related_concepts": {},
+            }
+        }
+
+    # Fallback: assume JSON file
     with open(json_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
