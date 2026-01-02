@@ -28,7 +28,6 @@ Measures how semantically related concepts are to the disease using sentence emb
 - Min/Max relevance: Range of similarities
 - Higher scores = more relevant concepts
 
-**Good threshold:** Average relevance > 0.5
 
 ### 3. **Quality Metrics**
 Assesses concept cleanliness:

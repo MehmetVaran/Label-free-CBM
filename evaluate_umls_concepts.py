@@ -317,21 +317,36 @@ class UMLSConceptEvaluator:
         type_diversity = min(unique_types / 10.0, 1.0)  # Normalize to 10 types
         scores["semantic_diversity"] = type_diversity
         
-        # Weighted overall score
-        weights = {
-            "coverage": 0.2,
-            "quality": 0.3,
-            "diversity": 0.2,
-            "relevance": 0.2,
-            "semantic_diversity": 0.1
-        }
+        # Adjust weights dynamically based on available data
+        # If semantic types aren't available (e.g., loading from .txt files),
+        # redistribute that weight proportionally to other metrics
+        has_semantic_types = unique_types > 0
+        
+        if has_semantic_types:
+            weights = {
+                "coverage": 0.2,
+                "quality": 0.3,
+                "diversity": 0.2,
+                "relevance": 0.2,
+                "semantic_diversity": 0.1
+            }
+        else:
+            # Redistribute semantic_diversity weight (0.1) proportionally
+            weights = {
+                "coverage": 0.222,      # 0.2 + 0.022
+                "quality": 0.333,       # 0.3 + 0.033
+                "diversity": 0.222,     # 0.2 + 0.022
+                "relevance": 0.222,     # 0.2 + 0.022
+                "semantic_diversity": 0.0
+            }
         
         overall = sum(scores[key] * weights[key] for key in weights.keys())
         
         return {
             "component_scores": scores,
             "overall_score": overall,
-            "weights": weights
+            "weights": weights,
+            "note": "Semantic type weights redistributed (not available in .txt format)" if not has_semantic_types else None
         }
     
     def generate_evaluation_report(
