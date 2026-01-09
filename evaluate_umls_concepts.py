@@ -317,21 +317,36 @@ class UMLSConceptEvaluator:
         type_diversity = min(unique_types / 10.0, 1.0)  # Normalize to 10 types
         scores["semantic_diversity"] = type_diversity
         
-        # Weighted overall score
-        weights = {
-            "coverage": 0.2,
-            "quality": 0.3,
-            "diversity": 0.2,
-            "relevance": 0.2,
-            "semantic_diversity": 0.1
-        }
+        # Adjust weights dynamically based on available data
+        # If semantic types aren't available (e.g., loading from .txt files),
+        # redistribute that weight proportionally to other metrics
+        has_semantic_types = unique_types > 0
+        
+        if has_semantic_types:
+            weights = {
+                "coverage": 0.2,
+                "quality": 0.3,
+                "diversity": 0.2,
+                "relevance": 0.2,
+                "semantic_diversity": 0.1
+            }
+        else:
+            # Redistribute semantic_diversity weight (0.1) proportionally
+            weights = {
+                "coverage": 0.222,      # 0.2 + 0.022
+                "quality": 0.333,       # 0.3 + 0.033
+                "diversity": 0.222,     # 0.2 + 0.022
+                "relevance": 0.222,     # 0.2 + 0.022
+                "semantic_diversity": 0.0
+            }
         
         overall = sum(scores[key] * weights[key] for key in weights.keys())
         
         return {
             "component_scores": scores,
             "overall_score": overall,
-            "weights": weights
+            "weights": weights,
+            "note": "Semantic type weights redistributed (not available in .txt format)" if not has_semantic_types else None
         }
     
     def generate_evaluation_report(
@@ -434,6 +449,36 @@ class UMLSConceptEvaluator:
 
 def load_disease_data(json_path: str) -> Dict[str, Dict[str, Any]]:
     """Load disease data from JSON file."""
+    p = Path(json_path)
+
+    # If a directory is provided, load all .txt files inside as separate diseases
+    if p.is_dir():
+        results: Dict[str, Dict[str, Any]] = {}
+        for txt in sorted(p.glob("*.txt")):
+            disease_name = txt.stem
+            lines = [l.strip() for l in txt.read_text(encoding="utf-8").splitlines() if l.strip()]
+            candidates = [{"name": name} for name in lines]
+            results[disease_name] = {
+                "disease": disease_name,
+                "candidate_concepts": candidates,
+                "related_concepts": {},
+            }
+        return results
+
+    # If a single text file is provided, treat it as one disease (filename -> disease)
+    if p.suffix.lower() == ".txt":
+        disease_name = p.stem
+        lines = [l.strip() for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
+        candidates = [{"name": name} for name in lines]
+        return {
+            disease_name: {
+                "disease": disease_name,
+                "candidate_concepts": candidates,
+                "related_concepts": {},
+            }
+        }
+
+    # Fallback: assume JSON file
     with open(json_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
