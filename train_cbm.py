@@ -174,7 +174,13 @@ def train_cbm_and_save(args):
     
     train_targets = data_utils.get_targets_only(d_train)
     val_targets = data_utils.get_targets_only(d_val)
-    
+
+    # Detect multi-label: ChestXrayDataset returns a 2-D float tensor [N, C]
+    # Single-label datasets return a plain list of ints
+    _t = train_targets
+    is_multilabel = isinstance(_t, torch.Tensor) and _t.dim() == 2
+    glm_family = 'multilabel' if is_multilabel else 'multinomial'
+
     with torch.no_grad():
         train_c = proj_layer(target_features.detach())
         val_c = proj_layer(val_target_features.detach())
@@ -184,26 +190,23 @@ def train_cbm_and_save(args):
         
         train_c -= train_mean
         train_c /= train_std
-        
-        train_y = torch.LongTensor(train_targets)
-        # Add these prints before indexed_train_ds = IndexedTensorDataset(train_c, train_y)
-        print(f"train_c shape: {train_c.shape}")
-        print(f"train_y shape: {train_y.shape}") 
-        print(f"Number of train_targets: {len(train_targets)}")
-        print(f"Number of target_features: {len(target_features)}")
 
-        # Add after loading target_features
-        print(f"Loaded target_features shape: {target_features.shape}")
-        print(f"Dataset: {args.dataset}")
-        print(f"d_train: {d_train}")
+        if is_multilabel:
+            train_y = train_targets.float()
+        else:
+            train_y = torch.LongTensor(train_targets)
+
         indexed_train_ds = IndexedTensorDataset(train_c, train_y)
 
         val_c -= train_mean
         val_c /= train_std
-        
-        val_y = torch.LongTensor(val_targets)
 
-        val_ds = TensorDataset(val_c,val_y)
+        if is_multilabel:
+            val_y = val_targets.float()
+        else:
+            val_y = torch.LongTensor(val_targets)
+
+        val_ds = TensorDataset(val_c, val_y)
 
 
     indexed_train_loader = DataLoader(indexed_train_ds, batch_size=args.saga_batch_size, shuffle=True)
@@ -222,7 +225,8 @@ def train_cbm_and_save(args):
 
     # Solve the GLM path
     output_proj = glm_saga(linear, indexed_train_loader, STEP_SIZE, args.n_iters, ALPHA, epsilon=1, k=1,
-                      val_loader=val_loader, do_zero=False, metadata=metadata, n_ex=len(target_features), n_classes = len(classes))
+                      val_loader=val_loader, do_zero=False, metadata=metadata, n_ex=len(target_features),
+                      n_classes=len(classes), family=glm_family)
     W_g = output_proj['path'][0]['weight']
     b_g = output_proj['path'][0]['bias']
     

@@ -116,6 +116,14 @@ def elastic_loss(linear, X, y, lam, alpha, family='multinomial', sample_weight=N
         else: 
             l = 0.5*F.mse_loss(linear(X),y,reduction='none')
             l = (l*(sample_weight.unsqueeze(1))).mean()
+    elif family == 'multilabel':
+        # Independent binary cross-entropy per class (sigmoid outputs)
+        y_f = y.float()
+        if sample_weight is None:
+            l = F.binary_cross_entropy_with_logits(linear(X), y_f, reduction='mean')
+        else:
+            l = F.binary_cross_entropy_with_logits(linear(X), y_f, reduction='none').mean(1)
+            l = (l * sample_weight).mean()
     else: 
         raise ValueError(f"Unknown family: {family}")
     return l + l1 + l2
@@ -148,6 +156,11 @@ def elastic_loss_and_acc(linear, X, y, lam, alpha, family='multinomial'):
     elif family == 'gaussian':
         l = 0.5*F.mse_loss(outputs, y, reduction='mean')
         acc = (outputs == y).float().mean()
+    elif family == 'multilabel':
+        y_f = y.float()
+        l = F.binary_cross_entropy_with_logits(outputs, y_f, reduction='mean')
+        # Per-class binary accuracy averaged over classes and samples
+        acc = ((outputs > 0).float() == y_f).float().mean()
     else: 
         raise ValueError(f"Unknown family {family}")
 
@@ -272,7 +285,7 @@ def train_saga(linear, loader, lr, nepochs, lam, alpha, group=True, verbose=None
         if n_classes is None: 
             if family == 'multinomial': 
                 n_classes = max(tensors[1].max().item() for tensors in loader) + 1
-            elif family == 'gaussian': 
+            elif family in ('gaussian', 'multilabel'): 
                 for batch in loader: 
                     y = batch[1]
                     break
@@ -332,6 +345,17 @@ def train_saga(linear, loader, lr, nepochs, lam, alpha, group=True, verbose=None
 
                     # Calculate new scalar gradient 
                     logits = linear(X)
+                elif family == 'multilabel':
+                    y_f = y.float().to(weight.device)
+                    if w is None:
+                        loss = F.binary_cross_entropy_with_logits(out, y_f, reduction='mean')
+                    else:
+                        loss = F.binary_cross_entropy_with_logits(out, y_f, reduction='none').mean(1)
+                        loss = (loss * w).mean()
+                    target = y_f
+
+                    # Gradient of BCE w.r.t. logits: sigmoid(z) - y
+                    logits = ch.sigmoid(linear(X))
                 else: 
                     raise ValueError(f"Unknown family: {family}")
                 total_loss += loss.item()*X.size(0)
@@ -431,8 +455,8 @@ def train_saga(linear, loader, lr, nepochs, lam, alpha, group=True, verbose=None
 def maximum_reg(X,y, group=True, family='multinomial'): 
     if family == 'multinomial': 
         target = ch.eye(y.max()+1)[y].to(y.device)
-    elif family == 'gaussian': 
-        target = y
+    elif family in ('gaussian', 'multilabel'): 
+        target = y.float()
     else: 
         raise ValueError(f"Unknown family {family}")
 
@@ -471,8 +495,8 @@ def maximum_reg_loader(loader, group=True, preprocess=None, metadata=None, famil
 
         if family == 'multinomial': 
             target = eye[y]
-        elif family == 'gaussian': 
-            target = y
+        elif family in ('gaussian', 'multilabel'): 
+            target = y.float()
         else: 
             raise ValueError(f"Unknown family {family}")
 
@@ -487,8 +511,8 @@ def maximum_reg_loader(loader, group=True, preprocess=None, metadata=None, famil
 
         if family == 'multinomial': 
             target = eye[y]
-        elif family == 'gaussian': 
-            target = y
+        elif family in ('gaussian', 'multilabel'): 
+            target = y.float()
         else: 
             raise ValueError(f"Unknown family {family}")
 
@@ -506,8 +530,8 @@ def maximum_reg_loader(loader, group=True, preprocess=None, metadata=None, famil
 
         if family == 'multinomial': 
             target = eye[y]
-        elif family == 'gaussian': 
-            target = y
+        elif family in ('gaussian', 'multilabel'): 
+            target = y.float()
         else: 
             raise ValueError(f"Unknown family {family}")
 
@@ -629,6 +653,8 @@ def glm_saga(linear, loader, max_lr, nepochs, alpha,
                 logger(f"({i}) lambda {lam:.4f}, loss {loss:.4f}, acc {acc:.4f} [val acc {acc_val:.4f}] [test acc {acc_test:.4f}], sparsity {nnz/total} [{nnz}/{total}], time {time.time()-start_time}, lr {lr:.4f}")
             elif family == 'gaussian': 
                 logger(f"({i}) lambda {lam:.4f}, loss {loss:.4f} [val loss {loss_val:.4f}] [test loss {loss_test:.4f}], sparsity {nnz/total} [{nnz}/{total}], time {time.time()-start_time}, lr {lr:.4f}")
+            elif family == 'multilabel':
+                logger(f"({i}) lambda {lam:.4f}, bce {loss:.4f}, per-class-acc {acc:.4f} [val bce {loss_val:.4f}, val per-class-acc {acc_val:.4f}], sparsity {nnz/total} [{nnz}/{total}], time {time.time()-start_time}, lr {lr:.4f}")
 
             if checkpoint is not None: 
                 ch.save(params, os.path.join(checkpoint,f"params{i}.pth"))

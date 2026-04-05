@@ -208,6 +208,37 @@ def get_accuracy_cbm(model, dataset, device, batch_size=250, num_workers=2):
             total += len(labels)
     return correct/total
 
+def get_auroc_cbm(model, dataset, device, batch_size=250, num_workers=2):
+    """Compute macro-averaged AUROC for multi-label classification (e.g., ChestXray14).
+
+    Returns a dict with 'macro_auroc' and per-class 'class_aurocs'.
+    """
+    from sklearn.metrics import roc_auc_score
+    all_probs = []
+    all_labels = []
+    for images, labels in tqdm(DataLoader(dataset, batch_size, num_workers=num_workers,
+                                           pin_memory=True)):
+        with torch.no_grad():
+            outs, _ = model(images.to(device))
+            probs = torch.sigmoid(outs).cpu()
+            all_probs.append(probs)
+            all_labels.append(labels.float().cpu())
+    all_probs = torch.cat(all_probs, dim=0).numpy()
+    all_labels = torch.cat(all_labels, dim=0).numpy()
+
+    n_classes = all_labels.shape[1]
+    class_aurocs = []
+    for c in range(n_classes):
+        # Skip classes with only one label value present (AUROC undefined)
+        if len(set(all_labels[:, c])) < 2:
+            class_aurocs.append(float('nan'))
+        else:
+            class_aurocs.append(roc_auc_score(all_labels[:, c], all_probs[:, c]))
+
+    valid = [v for v in class_aurocs if not (v != v)]  # exclude NaN
+    macro_auroc = sum(valid) / len(valid) if valid else float('nan')
+    return {'macro_auroc': macro_auroc, 'class_aurocs': class_aurocs}
+
 def get_preds_cbm(model, dataset, device, batch_size=250, num_workers=2):
     preds = []
     for images, labels in tqdm(DataLoader(dataset, batch_size, num_workers=num_workers,
